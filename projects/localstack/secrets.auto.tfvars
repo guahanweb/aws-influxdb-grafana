@@ -1,0 +1,7 @@
+influx_admin_pw = "testing"
+influx_user_pw = "testing"
+grafana_admin_pw = "testing"
+grafana_user_pw = "testing"
+key_pair_name = "my-access-key"
+public_key_path = "~/.ssh/aws_id.pub"
+private_key_path = "~/.ssh/aws_id"

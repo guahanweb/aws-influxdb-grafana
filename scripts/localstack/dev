@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export PROJECT_ROOT=$( dirname $( dirname "${DIR}" ) )
+export SCRIPTS_DIRECTORY="${PROJECT_ROOT}/scripts"
+
+[[ -f ~/.bashrc ]] && source ~/.bashrc
+[[ -f ${DIR}/settings.sh ]] && source ${DIR}/settings.sh
+[[ -f ${DIR}/utils.sh ]] && source ${DIR}/utils.sh
+[[ -f ${DIR}/subcommands.sh ]] && source ${DIR}/subcommands.sh
+
+ProgName=$(basename $0)
+subcommand=$1
+
+case $subcommand in
+    start )
+        info "starting localstack in the background."
+        LOCALSTACK_DOCKER_NAME=vr-labs_localstack docker-compose -f "${DIR}/docker-compose.yml" up --detach
+        info "running. to stop: ${BOLD_WHITE}${ProgName} stop${NC}"
+        ;;
+
+    stop )
+        info "stopping localstack if running."
+        docker-compose -f "${DIR}/docker-compose.yml" down
+        info "done"
+        ;;
+
+    * )
+        info "supported commands:"
+        echo "  ${BOLD_WHITE}start${NC}"
+        echo "  ${BOLD_WHITE}stop${NC}"
+        ;;
+
+esac

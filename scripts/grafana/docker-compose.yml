@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  influxdb:
+    image: influxdb:latest
+    ports:
+      - '8086:8086'
+    volumes:
+      - influxdb-storage:/var/lib/influxdb
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+      - V1_DB_NAME=db0
+      - V1_AUTH_USERNAME=v1-user
+      - V1_AUTH_PASSWORD=v1-password
+
+  grafana:
+    image: grafana/grafana-oss
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - '5000:3000'
+    depends_on:
+      - influxdb
+    environment:
+      - GF_LOG_LEVEL=debug
+      - GF_DEFAULT_INSTANCE_NAME=vrlabs-instance
+      - GF_SECURITY_ADMIN_USER=owner
+      - INFLUXDB_USERNAME=${INFLUXDB_USERNAME}
+      - INFLUXDB_PASSWORD=${INFLUXDB_PASSWORD}
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./config/grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana-provisioning:/etc/grafana/provisioning
+
+volumes:
+  influxdb-storage: {}
+  grafana-storage: {}
