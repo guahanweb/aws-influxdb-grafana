@@ -13,17 +13,14 @@ services:
       - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
       - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
-      - V1_DB_NAME=db0
-      - V1_AUTH_USERNAME=v1-user
-      - V1_AUTH_PASSWORD=v1-password
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
 
   grafana:
     image: grafana/grafana-oss
     container_name: grafana
     restart: unless-stopped
     ports:
-      - '5000:3000'
+      - '5080:3000'
     depends_on:
       - influxdb
     environment:
