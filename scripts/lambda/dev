@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export PROJECT_ROOT=$( dirname $( dirname "${DIR}" ) )
+export SCRIPTS_DIRECTORY="${PROJECT_ROOT}/scripts"
+
+[[ -f ~/.bashrc ]] && source ~/.bashrc
+[[ -f ${DIR}/settings.sh ]] && source ${DIR}/settings.sh
+[[ -f ${DIR}/utils.sh ]] && source ${DIR}/utils.sh
+[[ -f ${DIR}/subcommands.sh ]] && source ${DIR}/subcommands.sh
+
+ProgName=$(basename $0)
+subcommand=$1
+
+case $subcommand in
+    build )
+        # verify valid function is provided
+        functionName=$2
+        [[ ! -z "${functionName}" ]] || fail "function name must be provided: ${BOLD_WHITE}${ProgName} build <function-name>${NC}"
+
+        functionPath="${FUNCTION_ROOT}/${functionName}"
+        [[ -d "${functionPath}" ]] || fail "function ${BOLD_WHITE}${functionName}${NC} does not exist!"
+        [[ -f "${functionPath}/package.json" ]] || fail "function ${BOLD_WHITE}${functionName}${NC} is not a valid node project!"
+
+        info "building lambda source"
+        {
+            cd ${FUNCTION_ROOT}/${functionName}
+            npm install && npm run build
+        } > /dev/null 2>&1
+
+        info "installing production dependencies"
+        {
+            cp package*.json dist/
+            cd dist
+            npm ci --only=production
+        } > /dev/null 2>&1
+
+        version=$(cat "${functionPath}/package.json" | jq -r .version)
+        info "packaging version ${BOLD_WHITE}${version}${NC} of ${BOLD_WHITE}${functionName}${NC}"
+        {
+            cd "${functionPath}/dist"
+
+            [[ -f "../${version}.zip" ]] && rm "../${version}.zip"
+            zip -r -X "../${version}.zip" .
+        } > /dev/null 2>&1
+
+        ok "artifact created at: ${BOLD_WHITE}${functionPath}/${version}.zip${NC}"
+        ;;
+
+    stop )
+        info "stopping InfluxDB + Grafana if running."
+        docker-compose -f "${DIR}/docker-compose.yml" down
+        info "done"
+        ;;
+
+    * )
+        info "supported commands:"
+        echo "  ${BOLD_WHITE}start${NC}"
+        echo "  ${BOLD_WHITE}stop${NC}"
+        ;;
+
+esac
