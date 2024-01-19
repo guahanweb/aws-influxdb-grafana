@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "build:config": "tsc --project tsconfig.json --showConfig",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "lint": "eslint src"
   },
   "keywords": [],
   "author": "",

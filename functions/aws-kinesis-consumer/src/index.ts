@@ -18,7 +18,8 @@ interface IEventWildcardType {
 
 type EventRecord = IEventRecordType & IEventWildcardType;
 
-exports.handler = async function(event: any, context: any, callback: any) {
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+exports.handler = async function(event: any) {
     const client = new InfluxDB({
         url: config.influxdb.url,
         token: config.influxdb.token
@@ -31,6 +32,7 @@ exports.handler = async function(event: any, context: any, callback: any) {
     );
 
     // List of promises for all our writes
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     const promises = event.Records.map((record: any) => {
         // Kinesis data is base64 encoded, so decode it here
         const payload: string = Buffer.from(record.kinesis.data, 'base64').toString('ascii');
@@ -40,7 +42,7 @@ exports.handler = async function(event: any, context: any, callback: any) {
             const json = JSON.parse(payload);
             console.log('payload:', json);
             return writeRecord(json, api);
-        } catch (err: any) {
+        } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             console.error('error:', err);
 
             const record = new Point('Bad_Record')
@@ -56,13 +58,14 @@ exports.handler = async function(event: any, context: any, callback: any) {
     try {
         await Promise.all(promises);
         console.log('completed all promises');
-    } catch (err: any) {
+    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
         console.error('at least one promise failed:', err);
         throw err;
     }
 }
 
 // once we use SSM to store the token, this will replace environment variables
+/* eslint-disable-next-line */
 async function loadTokenFromSSM(parameter: string): Promise<any> {
     const ssm = new SSM();
     const options: SSM.Types.GetParameterRequest = {
@@ -90,7 +93,7 @@ function writeRecord(payload: EventRecord, api: WriteApi) {
     attributes.forEach((attr: string) => createField(record, attr, payload[attr]));
 
     // add any fields from meta
-    if (!!meta) {
+    if (meta) {
         const tagNames = ["session_id"];
         const metadata: [string, string|boolean|number][] = Object.entries(meta);
 

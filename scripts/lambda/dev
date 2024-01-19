@@ -46,6 +46,35 @@ case $subcommand in
         ok "artifact created at: ${BOLD_WHITE}${functionPath}/${version}.zip${NC}"
         ;;
 
+    create )
+        functionName=$2
+        [[ ! -z "${functionName}" ]] || fail "function name must be provided: ${BOLD_WHITE}${ProgName} create <function-name>${NC}"
+
+        functionPath="${FUNCTION_ROOT}/${functionName}"
+        # [[ ! -d "${functionPath}" ]] || fail "function ${BOLD_WHITE}${functionName}${NC} directory already exists!"
+
+        info "creating scaffolding for new function: ${BOLD_WHITE}${functionName}${NC}"
+        info "setting up function"
+        {
+            mkdir -p "${functionPath}" && cd "${functionPath}"
+
+            # create & update our package.json contents
+            npm init -y
+            package=$( jq ".name = \"${functionName}\"" package.json \
+                | jq '.scripts += {"build":"tsc --project tsconfig.json","clean":"rm -rf dist","lint":"eslint src"} | del(.scripts.test)' )
+            
+            echo "${package}" > package.json
+        } > /dev/null 2>&1
+        info "defining and installing dependencies"
+        {
+            cd "${functionPath}"
+            npm i -D "@tsconfig/node-lts" "@types/node" "@typescript-eslint/eslint-plugin" "@typescript-eslint/parser" eslint ts-node typescript
+            npm i -S aws-sdk
+            cp ${SCRIPTS_DIRECTORY}/lambda/scaffolding/{.eslintrc.js,tsconfig.json} .
+            cp -R ${SCRIPTS_DIRECTORY}/lambda/scaffolding/src .
+        } > /dev/null 2>&1
+        ;;
+
     stop )
         info "stopping InfluxDB + Grafana if running."
         docker-compose -f "${DIR}/docker-compose.yml" down

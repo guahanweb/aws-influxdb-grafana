@@ -18,6 +18,18 @@ case $subcommand in
         info "running. to stop: ${BOLD_WHITE}${ProgName} stop${NC}"
         ;;
 
+    generate-demo )
+
+        node ${DIR}/data/helper generate $2
+        ;;
+
+    hydrate-demo )
+        # assume we have gdate installed and running on mac
+        apiEndpoint=$2
+        [[ ! -z "${apiEndpoint}" ]] || fail "you must provide your api endpoint!"
+        node ${DIR}/data/helper hydrate "${apiEndpoint}"
+        ;;
+
     stop )
         info "stopping InfluxDB + Grafana if running."
         docker-compose -f "${DIR}/docker-compose.yml" down
