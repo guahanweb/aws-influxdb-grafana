@@ -29,8 +29,26 @@ resource "aws_api_gateway_model" "model" {
     content_type = "application/json"
 
     schema = <<EOF
-{"$schema":"http://json-schema.org/draft-04/schema#","title":"Todos","type":"object","properties":{"HID":{"type":"string"},"SID":{"type":"string"},"Data":{"type":"object"}},"required":["HID","SID","Data"]}
-EOF
+        {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "title": "EventRecord",
+            "type": "object",
+            "properties": {
+                "event": {
+                    "type": "object",
+                    "properties": {
+                        "type": { "type": "string" },
+                        "name": { "type": "string" },
+                        "value": { "type": ["string","number","boolean"] },
+                        "timestamp": { "type": "number" },
+                        "meta": { "type": "object" }
+                    },
+                    "required": ["type", "name", "value", "timestamp"],
+                    "additionalProperties": true
+                }
+            }
+        }
+    EOF
 }
 
 resource "aws_api_gateway_request_validator" "validator" {
@@ -219,4 +237,37 @@ resource "aws_iam_role" "role" {
             ]
         }
     POLICY
+}
+
+# Lambda consumer
+resource "aws_lambda_function" "consumer" {
+    filename      = "${var.function_path}/aws-kinesis-consumer/1.0.0.zip"
+    function_name = "consumer"
+    role          = aws_iam_role.role.arn
+    handler       = "index.handler"
+
+    source_code_hash = filebase64sha256("${var.function_path}/aws-kinesis-consumer/1.0.0.zip")
+
+    # LocalStack only supports up to Node.js 16
+    # runtime = "nodejs20.x"
+    runtime = "nodejs16.x"
+
+    environment {
+        variables = {
+            TIMESTAMP_PRECISION = "ms"
+            INFLUXDB_URL = "http://host.docker.internal:8086"
+            INFLUXDB_ORG = "vrlabs"
+            INFLUXDB_BUCKET = "telemetry"
+            INFLUXDB_TOKEN = var.influxdb_token
+        }
+    }
+}
+
+# Push to lambda from Kinesis stream
+resource "aws_lambda_event_source_mapping" "example" {
+  event_source_arn  = aws_kinesis_stream.stream.arn
+  function_name     = aws_lambda_function.consumer.arn
+  starting_position = "LATEST"
+  batch_size        = 5
+  enabled           = true
 }
