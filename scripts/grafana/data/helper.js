@@ -25,14 +25,24 @@ function init() {
             generateLogFile(logFile, Infinity);
         }
     } else if (cmd === "hydrate") {
-        syncLogsToInflux(logFile, modifier);
+        // syncLogsToInflux(logFile, modifier);
+        batchedLinereader(logFile, modifier);
     } else {
         console.error('unknown command:', cmd);
     }
 }
 
 async function syncLogsToInflux(filename, endpoint) {
-    const lineCount = await processLogFile(filename, (payload) => {
+    const result = await processLogFile(filename, (payload) => {
+        return new Promise((resolve, rejct) => {
+        });
+    });
+
+    console.log('result:', result);
+}
+
+function sendEventRecord(payload, endpoint) {
+    return new Promise((resolve, reject) => {
         // here is where we send the payload to InfluxDB
         const myUrl = new URL(endpoint);
         const postData = JSON.stringify(payload);
@@ -47,18 +57,57 @@ async function syncLogsToInflux(filename, endpoint) {
             }
         };
 
-        const req = http.request(options, (res) => {});
-        req.on('error', (e) => console.error(e));
+        const req = http.request(options, (res) => {
+            resolve();
+        });
+
+        req.on('error', (e) => reject(e));
         req.write(postData);
         req.end();
     });
+}
 
-    console.log('processed', lineCount, 'lines');
+function batchedLinereader(filename, endpoint) {
+    const fileStream = fs.createReadStream(filename);
+    const lineReader = readline.createInterface({
+        input: fileStream,
+    });
+
+    let queue = [];
+    lineReader.on('line', (line) => queue.push(line));
+    lineReader.on('close', () => {
+        // start processing
+        batchIt(10);
+    });
+
+    function batchIt(batchSize) {
+        console.log('processing:', batchSize);
+
+        Promise.all(
+            queue.splice(0, batchSize)
+                .map((line) => {
+                    const payload = JSON.parse(line);
+                    return sendEventRecord(payload, endpoint);
+                })
+        ).then(() => {
+            console.log('queue:', queue.length);
+
+            if (queue.length) {
+                batchIt(batchSize);
+            }
+        })
+    }
 }
 
 function processLogFile(filename, lineHandler) {
     // TODO: batch requests to the API to keep from 
     // killing LocalStack I/O
+    const maxLines = 10;
+    let queue = 0;
+    let paused = false;
+    let successCount = 0;
+    let errorCount = 0;
+
     return new Promise((resolve, reject) => {
         const fileStream = fs.createReadStream(filename);
         const lineReader = readline.createInterface({
@@ -68,12 +117,35 @@ function processLogFile(filename, lineHandler) {
         let lineCount = 0;
         lineReader.on('line', function (line) {
             const data = JSON.parse(line.trim());
-            lineHandler(data);
+            lineHandler(data)
+                .then(() => {
+                    successCount++;
+                    queue--;
+                    if (queue < maxLines && paused) {
+                        console.log('resuming...');
+                        lineReader.resume();
+                    }
+                })
+                .catch(() => errorCount++);
+
+            if (queue >= maxLines && !paused) {
+                console.log('pausing...');
+                lineReader.pause();
+            }
+
+            queue++;
             lineCount++;
         });
 
+        lineReader.on('pause', () => paused = true);
+        lineReader.on('resume', () => paused = false);
+
         lineReader.on('close', function () {
-            resolve(lineCount);
+            resolve({
+                lineCount,
+                successCount,
+                errorCount,
+            });
         });
     });
 }

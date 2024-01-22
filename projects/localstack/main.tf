@@ -239,12 +239,43 @@ resource "aws_iam_role" "role" {
     POLICY
 }
 
+resource "aws_iam_policy" "function_logging_policy" {
+  name   = "${var.project_name}-function_logging_policy"
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        Action : [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Effect : "Allow",
+        Resource : "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "function_logging" {
+    role = aws_iam_role.role.name
+    policy_arn = aws_iam_policy.function_logging_policy.arn
+}
+
+resource "aws_cloudwatch_log_group" "lambda_log_group" {
+  name              = "/aws/lambda/consumer"
+  retention_in_days = 7
+  lifecycle {
+    prevent_destroy = false
+  }
+}
+
 # Lambda consumer
 resource "aws_lambda_function" "consumer" {
     filename      = "${var.function_path}/aws-kinesis-consumer/1.0.0.zip"
     function_name = "consumer"
     role          = aws_iam_role.role.arn
     handler       = "index.handler"
+    depends_on = [ aws_cloudwatch_log_group.lambda_log_group ]
 
     source_code_hash = filebase64sha256("${var.function_path}/aws-kinesis-consumer/1.0.0.zip")
 
